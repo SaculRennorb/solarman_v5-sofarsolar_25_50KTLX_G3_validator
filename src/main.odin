@@ -177,9 +177,11 @@ show :: proc(logger_endpoint : string, logger_serial_str : string)
 
 	response_buffer : [512]u8
 
+	show_struct(devices.RegistersSysinfo           , 0x0400, logger_serial, &packet_serial, socket, response_buffer[:])
 	show_struct(devices.RegistersOutputData        , 0x0480, logger_serial, &packet_serial, socket, response_buffer[:])
-	show_struct(devices.RegistersHistoricProduction, 0x0680, logger_serial, &packet_serial, socket, response_buffer[:])
+	show_struct(devices.RegistersEmergencyOutput   , 0x0500, logger_serial, &packet_serial, socket, response_buffer[:])
 	show_struct(devices.RegistersIndividualStrings , 0x0580, logger_serial, &packet_serial, socket, response_buffer[:])
+	show_struct(devices.RegistersHistoricProduction, 0x0680, logger_serial, &packet_serial, socket, response_buffer[:])
 
 
 	show_struct :: proc($TargetStruct : typeid, target_reg : u16be, logger_serial : u32le, packet_serial : ^u16, socket : net.TCP_Socket, response_buffer : []u8)

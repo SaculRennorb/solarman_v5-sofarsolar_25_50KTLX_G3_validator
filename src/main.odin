@@ -6,24 +6,78 @@ import "core:fmt"
 import "core:slice"
 import "core:math/rand"
 import "core:strings"
+import "core:strconv"
+import "core:path/filepath"
 
 import "modbus"
 import "solarmanv5"
 
 main :: proc ()
 {
+	if len(os.args) < 2 {
+		help()
+		return
+	}
+
 	switch os.args[1] {
-		case "dump": dump(os.args[2], os.args[3])
-		case "show": show(os.args[2], os.args[3])
+		case "dump":	{
+			logger_serial : u32le
+			if logger_serial_, ok := strconv.parse_u64_maybe_prefixed(os.args[3]); ok {
+				logger_serial = u32le(logger_serial_)
+			}
+			else {
+				fmt.printf("Failed to parse logger serial from '%s'\n Fatal.\n", os.args[3])
+				return
+			}
+
+			requested_register_count : u16be = 16
+			if len(os.args) > 4 {
+				if requested_register_cnt_, ok : = strconv.parse_u64_maybe_prefixed(os.args[4]); ok {
+						requested_register_count = u16be(requested_register_cnt_)
+				}
+				else {
+					fmt.printf("Failed to parse register batch size from '%s'\n using default value of 16.\n", os.args[4])
+				}
+			}
+
+			dump(os.args[2], logger_serial, requested_register_count)
+		}
+
+
+		case "show": {
+			logger_serial : u32le
+			if logger_serial_, ok := strconv.parse_u64_maybe_prefixed(os.args[3]); ok {
+				logger_serial = u32le(logger_serial_)
+			}
+			else {
+				fmt.printf("Failed to parse logger serial from '%s'\n Fatal.\n", os.args[3])
+				return
+			}
+
+			show(os.args[2], logger_serial)
+		}
+
+
 		case "discover": discover()
-		case: fmt.printf(`usage:
-	%v dump <logger endpoint> <logger serial>
+
+
+		case:
+			fmt.printf("Unknown subcommand '%s'\n\n", os.args[1])
+			help()
+	}
+}
+
+help :: proc() {
+	_, file := filepath.split(os.args[0])
+	fmt.printf(`Usage:
+	%[1]v dump <logger endpoint> <logger serial (u32)> [<register count (u16) = 16>]
 		dump register values into out.txt
 		note: usually port 8899
-	%v discover
+	%[1]v show
+		show inforamtion form predefined blocks
+	%[1]v discover
 		broadcast discover message and wait for responses
-`, os.args[0], os.args[0])
-	}
+`, file)
 }
 
 discover :: proc()
@@ -35,7 +89,7 @@ discover :: proc()
 	fmt.println("done")
 }
 
-dump :: proc(logger_endpoint : string, logger_serial_str : string)
+dump :: proc(logger_endpoint : string, logger_serial : u32le, requested_register_cnt : u16be)
 {
 	socket, err := net.dial_tcp_from_hostname_and_port_string(logger_endpoint)
 	for err != nil {
@@ -53,17 +107,12 @@ dump :: proc(logger_endpoint : string, logger_serial_str : string)
 	line_builder : strings.Builder
 	strings.builder_init(&line_builder, 0, 64)
 
-
-
-	logger_serial_, _, _ : = fmt._parse_int(logger_serial_str, 0)
-	logger_serial := u32le(logger_serial_)
 	packet_serial : u16 = 0//u16(rand.int31()) & 0x00ff
 
 	//NOTE(Rennorb): reading is whitelisted by start register, not by the registers taht actually get read.
 	// This means you can read 0x0400 - 0x0440, but not 0x0404 - 0x0408.
 	// This also means you need to know the exact target you want to read.
 	address_step_size : u16 : 1
-	requested_register_cnt : u16be : 16 
 
 	response_buffer : [512]u8
 	frame : Frame
@@ -162,7 +211,7 @@ Frame :: struct #packed {
 
 import "devices"
 
-show :: proc(logger_endpoint : string, logger_serial_str : string)
+show :: proc(logger_endpoint : string, logger_serial : u32le)
 {
 	socket, err := net.dial_tcp_from_hostname_and_port_string(logger_endpoint)
 	for err != nil {
@@ -171,8 +220,6 @@ show :: proc(logger_endpoint : string, logger_serial_str : string)
 	}
 	defer net.close(socket)
 
-	logger_serial_, _, _ : = fmt._parse_int(logger_serial_str, 0)
-	logger_serial := u32le(logger_serial_)
 	packet_serial : u16 = 0//u16(rand.int31()) & 0x00ff
 
 	response_buffer : [512]u8

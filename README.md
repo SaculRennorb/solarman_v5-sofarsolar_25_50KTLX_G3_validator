@@ -5,7 +5,7 @@ This tool is by no means meant for production, and is very much held together by
 
 ### Compilation
 1. Install [odin](http://odin-lang.org/)
-2. run `oding run src -- <args>`
+2. run `odin run src -- <args>`
 
 There are still a lot of hard coded values in `main.odin` that you may want to tinker with. Values in other files, especially if named, are sourced from standards or generally agreed upon and should not need to change.
 
